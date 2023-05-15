@@ -1,6 +1,15 @@
-#include <message_slot.h>
-#include <linux/fs.h>
-#include <errno.h>
+#undef __KERNEL__
+#define __KERNEL__
+#undef MODULE
+#define MODULE
+
+
+#include <linux/kernel.h>   /* We're doing kernel work */
+#include <linux/module.h>   /* Specifically, a module */
+#include <linux/fs.h>       /* for register_chrdev */
+#include <linux/string.h>   /* for memset. NOTE - not string.h!*/
+#include <errno.h> /* error codes */
+#include "message_slot.h"
 
 int main (int argc, char** argv)
 {
