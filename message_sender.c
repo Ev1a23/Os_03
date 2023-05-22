@@ -8,6 +8,9 @@
 #include <string.h>
 #include <linux/fs.h>
 
+void error(char *msg);
+size_t len_msg(char* msg);
+
 int main (int argc, char** argv)
 {
     if(argc !=4)

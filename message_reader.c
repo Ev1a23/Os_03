@@ -8,6 +8,8 @@
 #include <string.h>
 #include <linux/fs.h>
 
+void error(char *msg);
+
 int main (int argc, char** argv)
 {
     if(argc !=3)
@@ -34,12 +36,11 @@ int main (int argc, char** argv)
     {
         error(strerror(errno));
     }
-    char msg[read_bytes]
+    char msg[read_bytes];
     for(int i = 0; i < read_bytes; ++i)
     {
         msg[i] = buffer[i];
     }
-    free(buffer);
 
     if(close(fd)<0)
     {
