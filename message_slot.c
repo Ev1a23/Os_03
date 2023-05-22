@@ -77,63 +77,6 @@ static int device_open( struct inode* inode,
     return SUCCESS;
   }
 }
-
-void delete_node(node* lst, int key)
-{
-  channel* temp = node;
-  channel* prev = NULL;
-  while(temp!= NULL)
-  {
-    if(temp->channel == key)
-      break;
-    prev = temp;
-    temp = temp->next;
-
-  }
-  if(temp== NULL)
-    return;
-  dev___open_flag--;
-  if(temp->next == NULL&& PREV != NULL)
-  {
-    prev->next = NULL;
-    kfree(temp->message);
-    kfree(temp);
-    temp = NULL;
-    return;
-  }
-  if(temp->next == NULL&& PREV == NULL)
-  {
-    kfree(temp->message);
-    kfree(temp);
-    temp = NULL;
-    return;
-  }
-  if(temp->next != NULL&& PREV == NULL)
-  {
-    node = temp->next;
-    kfree(temp->message);
-    kfree(temp);
-    temp = NULL;
-    return;
-  }
-  if(temp->next != NULL&& PREV != NULL)
-  {
-    prev->next = temp->next;
-    kfree(temp->message);
-    kfree(temp);
-    temp = NULL;
-    return;
-  }
-}
-
-void delete_lst(node* lst)
-{
-  while(lst!= NULL)
-  {
-    delete_node(lst, lst->channel);
-  }
-  return;
-}
 //---------------------------------------------------------------
 // a process which has already opened
 // the device file attempts to read from it
