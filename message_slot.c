@@ -19,26 +19,21 @@ MODULE_LICENSE("GPL");
 // used to prevent concurent access into the same device
 static int dev_open_flag = 0;
 
-static struct chardev_info device_info;
-
-// The message the device will give when asked
-static char the_message[BUF_LEN];
-
 //================== DEFINE CHANNEL LINKED LIST ===========================
 
-struct channel
+typedef struct channel
 {
   int channel;
-  char* message = NULL;
-  struct channel* next = NULL;
+  char* message;
+  struct channel* next;
   size_t message_len;
 } channel;
 //================== DEFINE MINOR LINKED LIST ===========================
-struct node
+typedef struct node
 {
   int minor;
-  struct node* next = NULL;
-  channel* channels = NULL;
+  struct node* next;
+  channel* channels;
 } node;
 
 node* head = NULL;
@@ -46,6 +41,9 @@ node* head = NULL;
 static int device_open( struct inode* inode,
                         struct file*  file )
 {
+  node* head;
+  node* temp;
+  node* new_node;
   int minor = iminor(inode);
   if(dev_open_flag == 0)
   {
@@ -59,8 +57,7 @@ static int device_open( struct inode* inode,
   }
   else
   {
-    int i;
-    node* temp = head;
+    temp = head;
     while(temp!= NULL)
     {
       if(temp->minor == minor)
@@ -68,7 +65,7 @@ static int device_open( struct inode* inode,
       temp = temp->next;
     }
     //need to add to LL
-    node* new_node = (node*)kmalloc(sizeof(node));
+    new_node = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     new_node->minor = minor;
     temp -> next = new_node;
     new_node->next = NULL;
@@ -80,18 +77,24 @@ static int device_open( struct inode* inode,
 //---------------------------------------------------------------
 // a process which has already opened
 // the device file attempts to read from it
-static size_t device_read( struct file* file,
+static ssize_t device_read( struct file* file,
                             char __user* buffer,
                             size_t       length,
                             loff_t*      offset )
 {
-  if(file -> private_data == NULL)
+  int minor;
+  channel* channels_table;
+  size_t i;
+  node* temp = head;
+  int channel;
+  int res;
+  void *p = file -> private_data;
+  if(p == NULL)
   {
     return -EINVAL;
   }
-  int minor = iminor(file->f_inode);
-  size_t i;
-  node* temp = head;
+
+  minor = iminor(file->f_inode);
   while(temp!= NULL)
   {
     if(temp->minor == minor)
@@ -102,13 +105,9 @@ static size_t device_read( struct file* file,
   {
     return -EINVAL;
   }
-  channel* channels_table = temp -> channels;
-  void* p = file -> private_data;
-  if(*p == NULL)
-  {
-    return -EINVAL;
-  }
-  int channel = (int)*p;
+
+  channels_table =  temp -> channels;
+  channel = (int)p;
   while(channels_table != NULL)
   {
     if(channels_table -> channel == channel)
@@ -119,21 +118,27 @@ static size_t device_read( struct file* file,
   {
     return -EINVAL;
   }
-  if(channels_table -> len >length)
+  if(channels_table -> message_len == 0)
   {
-    return -ENOSPC
+    return -ENOSPC;
   }
   if(channels_table -> message == NULL)
   {
     return -EWOULDBLOCK;
   }
-  for(i = 0; i < channels_table -> len; ++i)
+  for(i = 0; i < BUF_LEN && i<length; ++i)
   {
-    int res = put_user(channels_table -> message[i], &buffer[i]);
+    res = put_user(channels_table -> message[i], &buffer[i]);
     if(res < 0)
     {
+      kfree(channels_table -> message);
       return res;
     }
+  }
+  channels_table -> message_len = BUF_LEN;
+  if(length < BUF_LEN)
+  {
+    channels_table -> message_len = length;
   }
   return i;
 
@@ -142,24 +147,30 @@ static size_t device_read( struct file* file,
 //---------------------------------------------------------------
 // a processs which has already opened
 // the device file attempts to write to it
-static size_t device_write( struct file*       file,
+static ssize_t device_write( struct file*       file,
                              const char __user* buffer,
                              size_t             length,
                              loff_t*            offset)
 {
-  if(file -> private_data == NULL)
+  int minor;
+  size_t i;
+  node* temp;
+  channel* channels_table;
+  channel* prev;
+  channel* new_channel;
+  void *p =file -> private_data;
+  int channel;
+  int res;
+  if(p== NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
   if(length > BUF_LEN || length == 0)
   {
-    errno = EMSGSIZE;
-    return -1;
+    return -EMSGSIZE;
   }
-  int minor = iminor(file->f_inode);
-  size_t i;
-  node* temp = head;
+  minor = iminor(file->f_inode);
+  temp = head;
   while(temp!= NULL)
   {
     if(temp->minor == minor)
@@ -168,18 +179,11 @@ static size_t device_write( struct file*       file,
   }
   if(temp == NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
-  channel* channels_table = temp -> channels;
-  void* p = file -> private_data;
-  if(*p == NULL)
-  {
-    errno = EINVAL;
-    return -1;
-  }
-  int channel = (int)*p;
-  channel* prev = NULL;
+  channels_table = temp -> channels;
+  channel = (int)p;
+  prev = NULL;
   while(channels_table != NULL)
   {
     prev = channels_table;
@@ -194,17 +198,22 @@ static size_t device_write( struct file*       file,
     {
       return -EMSGSIZE;
     }
-    channel* new_channel = (channel*)kmalloc(sizeof(channel));
+    new_channel = (channel*)kmalloc(sizeof(channel));
     new_channel -> channel = channel;
-    new_channel -> len = length;
+    new_channel -> message_len = length;
     new_channel -> message = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
-    if(new_channel_msg == NULL)
+    if(new_channel-> message == NULL)
     {
       return -ENOMEM;
     }
     for(i = 0; i < length; ++i)
     {
-      get_user(new_channel -> message[i], &buffer[i]);
+      res = get_user(new_channel -> message[i], &buffer[i]);
+      if(res < 0)
+      {
+        kfree(new_channel -> message);
+        return res;
+      }
     }
     new_channel -> next = NULL;
     prev -> next = new_channel;
@@ -217,7 +226,7 @@ static size_t device_write( struct file*       file,
     {
       if(i < length)
       {
-        int res = get_user(channels_table -> message[i], &buffer[i]);
+        res = get_user(channels_table -> message[i], &buffer[i]);
         if(res<0)
         {
           kfree(channels_table -> message);
@@ -226,10 +235,10 @@ static size_t device_write( struct file*       file,
       }
       else
       {
-        channels_table -> message[i] = NULL;
+        channels_table -> message[i] = (char*) NULL;
       }
     }
-    channel_table -> len = length;
+    channels_table -> message_len = length;
     return length;
   }
 }
@@ -239,15 +248,20 @@ static long device_ioctl( struct   file* file,
                           unsigned int   ioctl_command_id,
                           unsigned long  ioctl_param )
 {
+  int minor;
+  node* temp;
+  channel* channels_table;
+  channel new;
+  void* p;
+  int channel;
+  
   if(ioctl_command_id != MSG_SLOT_CHANNEL || ioctl_param == 0)//need to figure out which command code
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
   file -> private_data = (void*)ioctl_param;
-  int minor = iminor(file->f_inode);
-  int i;
-  node* temp = head;
+  minor = iminor(file->f_inode);
+  temp = head;
   while(temp!= NULL)
   {
     if(temp->minor == minor)
@@ -256,16 +270,15 @@ static long device_ioctl( struct   file* file,
   }
   if(temp == NULL)
   {
-    return -1;
+    return -EINVAL;
   }
-  channel* channels_table = temp -> channels;
-  void* p = file -> private_data;
-  if(*p == NULL)
+  channels_table = temp -> channels;
+  p = file -> private_data;
+  if(p == NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
-  int channel = (int) *p;
+  channel = (int) *p;
   while (channels_table -> next != NULL)
   {
     if(channels_table -> channel == channel)
@@ -273,9 +286,9 @@ static long device_ioctl( struct   file* file,
     channels_table = channels_table -> next;
   }
   //need to add to LL
-  channel new = (channel*)kmalloc(sizeof(channel));
+  channel* new = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
   new -> channel = channel;
-  new -> message = (char*)kmalloc(sizeof(char) * BUF_LEN);
+  new -> message = (char*)kmalloc(sizeof(char) * BUF_LEN, GFP_KERNEL);
   new -> next = NULL;
   channels_table -> next = new;
   return SUCCESS;
@@ -291,7 +304,6 @@ struct file_operations Fops = {
   .write          = device_write,
   .open           = device_open,
   .unlocked_ioctl = device_ioctl,
-  .release        = device_release,
 };
 
 //---------------------------------------------------------------
@@ -299,8 +311,6 @@ struct file_operations Fops = {
 static int __init simple_init(void)
 {
   int rc = -1;
-  // init dev struct
-  memset( &device_info, 0, sizeof(struct chardev_info));
 
   // Register driver capabilities. Obtain major num
   rc = register_chrdev( MAJOR_NUM, DEVICE_RANGE_NAME, &Fops );
