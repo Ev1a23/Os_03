@@ -1,4 +1,4 @@
-#include <errno.h> /* error codes */
+#include <errno.h> 
 #include "message_slot.h"
 #include <fcntl.h>
 #include <sys/ioctl.h>
@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <linux/fs.h>
 
 int main (int argc, char** argv)
 {
