@@ -1,53 +1,61 @@
-#undef __KERNEL__
-#define __KERNEL__
-#undef MODULE
-#define MODULE
-
-
-#include <linux/kernel.h>   /* We're doing kernel work */
-#include <linux/module.h>   /* Specifically, a module */
-#include <linux/fs.h>       /* for register_chrdev */
-#include <linux/string.h>   /* for memset. NOTE - not string.h!*/
 #include <errno.h> /* error codes */
 #include "message_slot.h"
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
 int main (int argc, char** argv)
 {
     if(argc !=3)
     {
-        strerror(errno);
-        exit(1);
+        error(strerror(errno));
     }
     int fd = open(argv[1], O_RDONLY);
     if(fd < 0)
     {
-        strerror(errno);
-        exit(1);
+        error(strerror(errno));
     }
-    int channel_id = atoi(argv[2]);
+    long channel_id = strtoul(argv[2], NULL, 0);
     if(ioctl(fd, MSG_SLOT_CHANNEL, channel_id) < 0)
     {
-        strerror(errno);
-        exit(1);
+        error(strerror(errno));
     }
     char buffer[BUF_LEN];
+    if(buffer==NULL)
+    {
+        error(strerror(errno));
+    }
     int read_bytes = read(fd, buffer, BUF_LEN);
     if(read_bytes < 0)
     {
-        strerror(errno);
-        exit(1);
+        error(strerror(errno));
     }
-    buffer[read_bytes] = '\0';
-    if(write(1, buffer, read_bytes)<0)
+    char msg[read_bytes]
+    for(int i = 0; i < read_bytes; ++i)
     {
-        strerror(errno);
-        exit(1);
+        msg[i] = buffer[i];
     }
+    free(buffer);
+
     if(close(fd)<0)
     {
-        strerror(errno);
-        exit(1);
+        error(strerror(errno));
     }
+
+    if(write(1, msg, read_bytes)<0)
+    {
+        error(strerror(errno));
+    }
+    
     exit(0);
 
+}
+
+void error(char *msg)
+{
+    fprintf(stderr, "%s", msg);
+    exit(1);
 }
