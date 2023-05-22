@@ -38,7 +38,7 @@ int main (int argc, char** argv)
 
 size_t len_msg(char* msg)
 {
-    ssize_t len = 0;
+    size_t len = 0;
     while(msg[len] != '\0')
     {
         ++len;

@@ -31,7 +31,7 @@ struct channel
   int channel;
   char* message = NULL;
   struct channel* next = NULL;
-  ssize_t message_len;
+  size_t message_len;
 } channel;
 //================== DEFINE MINOR LINKED LIST ===========================
 struct node
@@ -80,7 +80,7 @@ static int device_open( struct inode* inode,
 //---------------------------------------------------------------
 // a process which has already opened
 // the device file attempts to read from it
-static ssize_t device_read( struct file* file,
+static size_t device_read( struct file* file,
                             char __user* buffer,
                             size_t       length,
                             loff_t*      offset )
@@ -90,7 +90,7 @@ static ssize_t device_read( struct file* file,
     return -EINVAL;
   }
   int minor = iminor(file->f_inode);
-  ssize_t i;
+  size_t i;
   node* temp = head;
   while(temp!= NULL)
   {
@@ -142,7 +142,7 @@ static ssize_t device_read( struct file* file,
 //---------------------------------------------------------------
 // a processs which has already opened
 // the device file attempts to write to it
-static ssize_t device_write( struct file*       file,
+static size_t device_write( struct file*       file,
                              const char __user* buffer,
                              size_t             length,
                              loff_t*            offset)
@@ -158,7 +158,7 @@ static ssize_t device_write( struct file*       file,
     return -1;
   }
   int minor = iminor(file->f_inode);
-  ssize_t i;
+  size_t i;
   node* temp = head;
   while(temp!= NULL)
   {
