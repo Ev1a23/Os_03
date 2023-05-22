@@ -159,7 +159,7 @@ static ssize_t device_write( struct file*       file,
   channel* prev;
   channel* new_channel;
   void *p =file -> private_data;
-  int channel;
+  int cnl;
   int res;
   if(p== NULL)
   {
@@ -182,12 +182,12 @@ static ssize_t device_write( struct file*       file,
     return -EINVAL;
   }
   channels_table = temp -> channels;
-  channel = (int)p;
+  cnl = (int)p;
   prev = NULL;
   while(channels_table != NULL)
   {
     prev = channels_table;
-    if(channels_table -> channel == channel)
+    if(channels_table -> channel == cnl)
       break;
     channels_table = channels_table -> next;
   }
@@ -198,8 +198,8 @@ static ssize_t device_write( struct file*       file,
     {
       return -EMSGSIZE;
     }
-    new_channel = (channel*)kmalloc(sizeof(channel));
-    new_channel -> channel = channel;
+    new_channel = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
+    new_channel -> channel = cnl;
     new_channel -> message_len = length;
     new_channel -> message = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
     if(new_channel-> message == NULL)
@@ -232,10 +232,6 @@ static ssize_t device_write( struct file*       file,
           kfree(channels_table -> message);
           return res;
         }
-      }
-      else
-      {
-        channels_table -> message[i] = (char*) NULL;
       }
     }
     channels_table -> message_len = length;
@@ -278,7 +274,7 @@ static long device_ioctl( struct   file* file,
   {
     return -EINVAL;
   }
-  channel = (int) *p;
+  channel = (int)p;
   while (channels_table -> next != NULL)
   {
     if(channels_table -> channel == channel)
@@ -286,10 +282,10 @@ static long device_ioctl( struct   file* file,
     channels_table = channels_table -> next;
   }
   //need to add to LL
-  channel* new = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
-  new -> channel = channel;
-  new -> message = (char*)kmalloc(sizeof(char) * BUF_LEN, GFP_KERNEL);
-  new -> next = NULL;
+  new = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
+  *new -> channel = channel;
+  *new -> message = (char*)kmalloc(sizeof(char) * BUF_LEN, GFP_KERNEL);
+  *new -> next = NULL;
   channels_table -> next = new;
   return SUCCESS;
 }
