@@ -10,10 +10,8 @@
 #include <linux/kernel.h>   /* We're doing kernel work */
 #include <linux/module.h>   /* Specifically, a module */
 #include <linux/fs.h>       /* for register_chrdev */
-#include <linux/uaccess.h>  /* for get_user and put_user */
 #include <linux/string.h>   /* for memset. NOTE - not string.h!*/
 #include <linux/slab.h>     /* for kmalloc */
-#include <errno.h> /* error codes */
 #include "message_slot.h"
 
 MODULE_LICENSE("GPL");
@@ -52,7 +50,7 @@ static int device_open( struct inode* inode,
   if(dev_open_flag == 0)
   {
     //need to build the LL
-    head = (node*)kmalloc(sizeof(node));
+    head = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     head->minor = minor;
     head->next = NULL;
     head->channels = NULL;
@@ -80,47 +78,61 @@ static int device_open( struct inode* inode,
   }
 }
 
-//---------------------------------------------------------------
-static int device_release( struct inode* inode,
-                           struct file*  file)
+void delete_node(node* lst, int key)
 {
-  int minor = iminor(inode);
-  int i;
-  node* temp = head;
-  node* prev = NULL;
+  channel* temp = node;
+  channel* prev = NULL;
   while(temp!= NULL)
   {
-    if(temp->minor == minor)
+    if(temp->channel == key)
       break;
-    temp = temp->next;
     prev = temp;
+    temp = temp->next;
+
   }
-  if(temp == NULL)
+  if(temp== NULL)
+    return;
+  dev___open_flag--;
+  if(temp->next == NULL&& PREV != NULL)
   {
-    return -1;
-  }
-  channel* channels_table = temp -> channels;
-  while (channels_table != NULL)
-  {
-    channel* tmp_cnl = channels_table -> next;
-    kfree(channels_table -> message);
-    channels_table -> next = NULL;
-    kfree(channels_table);
-    channels_table = tmp_cnl;
-  }
-  if(prev == NULL)
-  {
-    head = temp -> next;
-    temp -> next = NULL;
-  }
-  else
-  {
-    prev -> next = temp -> next;
-    temp -> next = NULL;
+    prev->next = NULL;
+    kfree(temp->message);
     kfree(temp);
+    temp = NULL;
+    return;
   }
-  --dev_open_flag;
-  return SUCCESS;
+  if(temp->next == NULL&& PREV == NULL)
+  {
+    kfree(temp->message);
+    kfree(temp);
+    temp = NULL;
+    return;
+  }
+  if(temp->next != NULL&& PREV == NULL)
+  {
+    node = temp->next;
+    kfree(temp->message);
+    kfree(temp);
+    temp = NULL;
+    return;
+  }
+  if(temp->next != NULL&& PREV != NULL)
+  {
+    prev->next = temp->next;
+    kfree(temp->message);
+    kfree(temp);
+    temp = NULL;
+    return;
+  }
+}
+
+void delete_lst(node* lst)
+{
+  while(lst!= NULL)
+  {
+    delete_node(lst, lst->channel);
+  }
+  return;
 }
 //---------------------------------------------------------------
 // a process which has already opened
@@ -132,8 +144,7 @@ static ssize_t device_read( struct file* file,
 {
   if(file -> private_data == NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
   int minor = iminor(file->f_inode);
   ssize_t i;
@@ -146,15 +157,13 @@ static ssize_t device_read( struct file* file,
   }
   if(temp == NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
   channel* channels_table = temp -> channels;
   void* p = file -> private_data;
   if(*p == NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
   int channel = (int)*p;
   while(channels_table != NULL)
@@ -165,22 +174,23 @@ static ssize_t device_read( struct file* file,
   }
   if(channels_table == NULL)
   {
-    errno = EINVAL;
-    return -1;
+    return -EINVAL;
   }
   if(channels_table -> len >length)
   {
-    errno = ENOSPC;
-    return -1;
+    return -ENOSPC
   }
   if(channels_table -> message == NULL)
   {
-    errno = EWOULDBLOCK;
-    return -1;
+    return -EWOULDBLOCK;
   }
   for(i = 0; i < channels_table -> len; ++i)
   {
-    get_user(channels_table -> message[i], &buffer[i]);
+    int res = put_user(channels_table -> message[i], &buffer[i]);
+    if(res < 0)
+    {
+      return res;
+    }
   }
   return i;
 
@@ -237,10 +247,18 @@ static ssize_t device_write( struct file*       file,
   if(channels_table == NULL)
   {
     //prev is the last item in the LL, and we need to add a new channel
+    if(length == 0 || length>BUF_LEN)
+    {
+      return -EMSGSIZE;
+    }
     channel* new_channel = (channel*)kmalloc(sizeof(channel));
     new_channel -> channel = channel;
     new_channel -> len = length;
-    new_channel -> message = (char*)kmalloc(sizeof(char)*BUF_LEN);
+    new_channel -> message = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
+    if(new_channel_msg == NULL)
+    {
+      return -ENOMEM;
+    }
     for(i = 0; i < length; ++i)
     {
       get_user(new_channel -> message[i], &buffer[i]);
@@ -256,7 +274,12 @@ static ssize_t device_write( struct file*       file,
     {
       if(i < length)
       {
-        get_user(channels_table -> message[i], &buffer[i]);
+        int res = get_user(channels_table -> message[i], &buffer[i]);
+        if(res<0)
+        {
+          kfree(channels_table -> message);
+          return res;
+        }
       }
       else
       {
