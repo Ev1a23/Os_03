@@ -45,6 +45,10 @@ int main (int argc, char** argv)
 
 size_t len_msg(char* msg)
 {
+    if(msg == NULL)
+    {
+        return 0;
+    }
     size_t len = 0;
     while(msg[len] != '\0')
     {
