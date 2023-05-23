@@ -41,11 +41,11 @@ node* minor_lst;
 static int device_open( struct inode* inode,
                         struct file*  file )
 {
-  printk("In device open");
   node* head;
   node* temp;
   node* new_node;
   int minor = iminor(inode);
+  printk("In device open");
   if(minor_lst == NULL)
   {
     printk("minor_lst is NULL");
@@ -92,11 +92,11 @@ static ssize_t device_read( struct file* file,
                             size_t       length,
                             loff_t*      offset )
 {
-  printk("In device read");
   void *p = file -> private_data;
   channel* cnl;
   ssize_t i;
   int res;
+  printk("In device read");
   if(p == NULL)
   {
     return -EINVAL;
@@ -118,7 +118,7 @@ static ssize_t device_read( struct file* file,
       return i;
     }
   }
-  printk("Read %d bytes", i);
+  printk("Read %ld bytes", i);
   return i;
 
 }
@@ -131,15 +131,15 @@ static ssize_t device_write( struct file*       file,
                              size_t             length,
                              loff_t*            offset)
 {
-  printk("In device write");
   channel* cnl;
   char* msg;
   void *p;
   ssize_t i;
   int res;
+  printk("In device write");
   if(length > BUF_LEN || length == 0)
   {
-    printk("Invalid length")
+    printk("Invalid length");
     return -EMSGSIZE;
   }
   msg = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
@@ -150,7 +150,7 @@ static ssize_t device_write( struct file*       file,
   p = file ->private_data;
   if(p == NULL)
   {
-    printk("p is NULL")
+    printk("p is NULL");
     return -EINVAL;
   }
   cnl = (channel*)p;
@@ -181,10 +181,10 @@ static long device_ioctl( struct   file* file,
                           unsigned int   ioctl_command_id,
                           unsigned long  ioctl_param )
 {
-  printk("In device ioctl");
   int minor;
   node* temp;
   channel* cnl;
+  printk("In device ioctl");
   if(ioctl_command_id != MSG_SLOT_CHANNEL || ioctl_param == 0)
   {
     return -EINVAL;
