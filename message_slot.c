@@ -86,7 +86,7 @@ static ssize_t device_read( struct file* file,
   channel* channels_table;
   size_t i;
   node* temp = head;
-  int channel;
+  channel* cnl;
   int res;
   void *p = file -> private_data;
   if(p == NULL)
@@ -107,10 +107,14 @@ static ssize_t device_read( struct file* file,
   }
 
   channels_table =  temp -> channels;
-  channel = (int)p;
+  cnl = (channel*)p;
+  if(cnl->message == NULL)
+  {
+    return -EWOULDBLOCK;
+  }
   while(channels_table != NULL)
   {
-    if(channels_table -> channel == channel)
+    if(channels_table -> channel == cnl ->channel)
       break;
     channels_table = channels_table -> next;
   }
@@ -159,7 +163,7 @@ static ssize_t device_write( struct file*       file,
   channel* prev;
   channel* new_channel;
   void *p =file -> private_data;
-  int cnl;
+  channel* cnl;
   int res;
   if(p== NULL)
   {
@@ -182,12 +186,20 @@ static ssize_t device_write( struct file*       file,
     return -EINVAL;
   }
   channels_table = temp -> channels;
-  cnl = (int)p;
+  cnl = (channel*)p;
+  if(cnl->message == NULL)
+  {
+    cnl->message = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
+    if(cnl->message == NULL)
+    {
+      return -ENOMEM;
+    }
+  }
   prev = NULL;
   while(channels_table != NULL)
   {
     prev = channels_table;
-    if(channels_table -> channel == cnl)
+    if(channels_table -> channel == cnl->channel)
       break;
     channels_table = channels_table -> next;
   }
@@ -199,7 +211,7 @@ static ssize_t device_write( struct file*       file,
       return -EMSGSIZE;
     }
     new_channel = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
-    new_channel -> channel = cnl;
+    new_channel -> channel = cnl->channel;
     new_channel -> message_len = length;
     new_channel -> message = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
     if(new_channel-> message == NULL)
@@ -247,9 +259,9 @@ static long device_ioctl( struct   file* file,
   int minor;
   node* temp;
   channel* channels_table;
-  channel new;
+  channel* new;
   void* p;
-  int channel;
+  channel* cnl;
   
   if(ioctl_command_id != MSG_SLOT_CHANNEL || ioctl_param == 0)//need to figure out which command code
   {
@@ -274,18 +286,18 @@ static long device_ioctl( struct   file* file,
   {
     return -EINVAL;
   }
-  channel = (int)p;
+  cnl = (channel*)p;
   while (channels_table -> next != NULL)
   {
-    if(channels_table -> channel == channel)
+    if(channels_table -> channel == cnl->channel)
       return SUCCESS;
     channels_table = channels_table -> next;
   }
   //need to add to LL
   new = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
-  *new -> channel = channel;
-  *new -> message = (char*)kmalloc(sizeof(char) * BUF_LEN, GFP_KERNEL);
-  *new -> next = NULL;
+  new -> channel = cnl->channel;
+  new -> message = (char*)kmalloc(sizeof(char) * BUF_LEN, GFP_KERNEL);
+  new -> next = NULL;
   channels_table -> next = new;
   return SUCCESS;
 }
