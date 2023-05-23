@@ -1,4 +1,4 @@
-message_slot.o: /home/student/OS/Hw_03/Os_03/message_slot.c \
+message_slot.o: /home/student/Os_Course/Os_03/message_slot.c \
  /usr/src/linux-headers-5.10.0-21-common/include/linux/kconfig.h \
  include/generated/autoconf.h \
  /usr/src/linux-headers-5.10.0-21-common/include/linux/compiler_types.h \
@@ -446,4 +446,4 @@ message_slot.o: /home/student/OS/Hw_03/Os_03/message_slot.c \
  /usr/src/linux-headers-5.10.0-21-common/include/linux/overflow.h \
  /usr/src/linux-headers-5.10.0-21-common/include/linux/percpu-refcount.h \
  /usr/src/linux-headers-5.10.0-21-common/include/linux/kasan.h \
- /home/student/OS/Hw_03/Os_03/message_slot.h
+ /home/student/Os_Course/Os_03/message_slot.h
