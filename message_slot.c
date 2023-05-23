@@ -203,7 +203,16 @@ static long device_ioctl( struct   file* file,
     return -EINVAL;
   }
   cnl = temp ->channels;
-  while(cnl ->next != NULL)
+  if(cnl == NULL)
+  {
+    cnl = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
+    if(cnl == NULL)
+    {
+      return -ENOMEM;
+    }
+    cnl ->channel = ioctl_param;
+  }
+  while(cnl != NULL)
   {
     if(cnl->channel == ioctl_param)
     {
@@ -243,6 +252,7 @@ static int __init simple_init(void)
 
   // Negative values signify an error
   if( rc < 0 ) {
+    printk("tds");
     printk("%s registraion failed for  %d\n",
                        DEVICE_FILE_NAME, MAJOR_NUM );
     return rc;
