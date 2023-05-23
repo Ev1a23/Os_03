@@ -193,7 +193,7 @@ static long device_ioctl( struct   file* file,
   }
   minor = iminor(file->f_inode);
   temp = minor_lst;
-  while(temp ->next!= NULL)
+  while(temp!= NULL)
   {
     if(temp->minor == minor)
       break;
