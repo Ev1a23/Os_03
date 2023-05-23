@@ -44,6 +44,7 @@ static int device_open( struct inode* inode,
   node* head;
   node* temp;
   node* new_node;
+  node* prev;
   int minor = iminor(inode);
   printk("In device open");
   if(minor_lst == NULL)
@@ -65,13 +66,14 @@ static int device_open( struct inode* inode,
   {
     printk("minor_lst is not NULL");
     temp = minor_lst;
-    while(temp ->next!= NULL)
+    while(temp!= NULL)
     {
       if(temp->minor == minor)
       {
         printk("Device open, found minor");
         return SUCCESS;
       }
+      prev = temp;
       temp = temp->next;
     }
     printk("Device open, did not find minor");
