@@ -231,6 +231,11 @@ static int __init simple_init(void)
                        DEVICE_FILE_NAME, MAJOR_NUM );
     return rc;
   }
+  minor_lst = (node*)kmalloc(sizeof(node), GFP_KERNEL);
+  if(minor_lst == NULL)
+  {
+    return -ENOMEM;
+  }
   return 0;
 }
 
