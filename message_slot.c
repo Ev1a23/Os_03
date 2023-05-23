@@ -210,7 +210,7 @@ static long device_ioctl( struct   file* file,
     {
       return -ENOMEM;
     }
-    printk("cnl is NULL, creating new one")
+    printk("cnl is NULL, creating new one");
     cnl->channel = ioctl_param;
     cnl->message = (void*)NULL;
     cnl->message_len = 0;
