@@ -41,12 +41,14 @@ node* minor_lst;
 static int device_open( struct inode* inode,
                         struct file*  file )
 {
+  printk("In device open");
   node* head;
   node* temp;
   node* new_node;
   int minor = iminor(inode);
   if(minor_lst == NULL)
   {
+    printk("minor_lst is NULL");
     //need to build the LL
     head = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     if(head == NULL)
@@ -61,13 +63,18 @@ static int device_open( struct inode* inode,
   }
   else
   {
+    printk("minor_lst is not NULL");
     temp = minor_lst;
     while(temp ->next!= NULL)
     {
       if(temp->minor == minor)
+      {
+        printk("Device open, found minor");
         return SUCCESS;
+      }
       temp = temp->next;
     }
+    printk("Device open, did not find minor");
     //need to add to LL
     new_node = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     new_node->minor = minor;
@@ -85,6 +92,7 @@ static ssize_t device_read( struct file* file,
                             size_t       length,
                             loff_t*      offset )
 {
+  printk("In device read");
   void *p = file -> private_data;
   channel* cnl;
   ssize_t i;
@@ -110,6 +118,7 @@ static ssize_t device_read( struct file* file,
       return i;
     }
   }
+  printk("Read %d bytes", i);
   return i;
 
 }
@@ -122,6 +131,7 @@ static ssize_t device_write( struct file*       file,
                              size_t             length,
                              loff_t*            offset)
 {
+  printk("In device write");
   channel* cnl;
   char* msg;
   void *p;
@@ -129,6 +139,7 @@ static ssize_t device_write( struct file*       file,
   int res;
   if(length > BUF_LEN || length == 0)
   {
+    printk("Invalid length")
     return -EMSGSIZE;
   }
   msg = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
@@ -139,6 +150,7 @@ static ssize_t device_write( struct file*       file,
   p = file ->private_data;
   if(p == NULL)
   {
+    printk("p is NULL")
     return -EINVAL;
   }
   cnl = (channel*)p;
@@ -169,6 +181,7 @@ static long device_ioctl( struct   file* file,
                           unsigned int   ioctl_command_id,
                           unsigned long  ioctl_param )
 {
+  printk("In device ioctl");
   int minor;
   node* temp;
   channel* cnl;
@@ -186,6 +199,7 @@ static long device_ioctl( struct   file* file,
   }
   if(temp == NULL)
   {
+    printk("temp is NULL");
     return -EINVAL;
   }
   cnl = temp ->channels;
@@ -193,6 +207,7 @@ static long device_ioctl( struct   file* file,
   {
     if(cnl->channel == ioctl_param)
     {
+      printk("Found channel");
       cnl ->message = NULL;
       cnl ->message_len = 0;
       file -> private_data = (void*)cnl;
@@ -221,6 +236,7 @@ struct file_operations Fops = {
 static int __init simple_init(void)
 {
   int rc = -1;
+  printk("In simple init");
 
   // Register driver capabilities. Obtain major num
   rc = register_chrdev( MAJOR_NUM, DEVICE_RANGE_NAME, &Fops );
@@ -236,6 +252,7 @@ static int __init simple_init(void)
   {
     return -ENOMEM;
   }
+  printk("Simple init, minor_lst allocated");
   return 0;
 }
 
