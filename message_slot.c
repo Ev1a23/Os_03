@@ -226,10 +226,6 @@ static long device_ioctl( struct   file* file,
   {
     if(cnl->channel == ioctl_param)
     {
-      // printk("Found channel");
-      // cnl -> channel = ioctl_param;
-      // cnl ->message = (void*)NULL;
-      // cnl ->message_len = 0;
       file -> private_data = (void*)cnl;
       return 1;
     }
