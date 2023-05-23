@@ -104,7 +104,7 @@ static ssize_t device_read( struct file* file,
   }
   for(i = 0; i<BUF_LEN && i<length; i++)
   {
-    res = put_user((char*)(cnl->message)[i], &buffer[i]);
+    res = put_user(((char*)cnl->message)[i], &buffer[i])
     if(res < 0)
     {
       return i;
