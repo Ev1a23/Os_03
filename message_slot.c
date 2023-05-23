@@ -236,23 +236,33 @@ struct file_operations Fops = {
 static int __init simple_init(void)
 {
   int rc = -1;
-  printk("In simple init");
+  // init dev struct
+  //memset( &device_info, 0, sizeof(struct chardev_info) );
+  //spin_lock_init( &device_info.lock );
 
   // Register driver capabilities. Obtain major num
   rc = register_chrdev( MAJOR_NUM, DEVICE_RANGE_NAME, &Fops );
 
   // Negative values signify an error
   if( rc < 0 ) {
-    printk( KERN_ALERT "%s registraion failed for  %d\n",
+    printk( KERN_ERR "%s registraion failed for  %d\n",
                        DEVICE_FILE_NAME, MAJOR_NUM );
     return rc;
   }
-  minor_lst = (node*)kmalloc(sizeof(node), GFP_KERNEL);
+
+  printk( "Registeration is successful. ");
+  printk( "If you want to talk to the device driver,\n" );
+  printk( "you have to create a device file:\n" );
+  printk( "mknod /dev/%s c %d 0\n", DEVICE_FILE_NAME, MAJOR_NUM );
+  printk( "You can echo/cat to/from the device file.\n" );
+  printk( "Dont forget to rm the device file and "
+          "rmmod when you're done\n" );
+  minor_lst = (node*) kmalloc(sizeof(node), GFP_KERNEL);
   if(minor_lst == NULL)
   {
     return -ENOMEM;
   }
-  printk("Simple init, minor_lst allocated");
+  printk("minor_lst initialized");
   return 0;
 }
 
