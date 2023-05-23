@@ -218,6 +218,7 @@ static long device_ioctl( struct   file* file,
     cnl->message_len = 0;
     cnl->next = NULL;
     file -> private_data = (void*)cnl;
+    temp->channels = cnl;
     return 1;
 
   }
