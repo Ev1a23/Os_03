@@ -148,6 +148,11 @@ static ssize_t device_write( struct file*       file,
     printk("Invalid length");
     return -EMSGSIZE;
   }
+  if(buffer == NULL)
+  {
+    printk("Buffer is NULL");
+    return -EINVAL;
+  }
   msg = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
   if(msg == NULL)
   {
