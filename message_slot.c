@@ -211,6 +211,9 @@ static long device_ioctl( struct   file* file,
       return -ENOMEM;
     }
     cnl ->channel = ioctl_param;
+    cnl ->message = NULL;
+    cnl ->message_len = 0;
+    cnl->next = NULL;
   }
   while(cnl != NULL)
   {
