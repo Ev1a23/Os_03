@@ -210,7 +210,7 @@ static long device_ioctl( struct   file* file,
     cnl = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
     if(cnl == NULL)
     {
-      return -ENOMEM;
+      return -ENOMSG;
     }
     printk("cnl is NULL, creating new one");
     cnl->channel = ioctl_param;

@@ -28,6 +28,10 @@ int main (int argc, char** argv)
         error(strerror(errno));
     }
     size_t len = len_msg(argv[3]);
+    if(len == 0)
+    {
+        error(strerror(errno));
+    }
     if(write(fd, argv[3], len)<0)
     {
         error(strerror(errno));
