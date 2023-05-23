@@ -80,7 +80,7 @@ static int device_open( struct inode* inode,
     //need to add to LL
     new_node = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     new_node->minor = minor;
-    temp -> next = new_node;
+    prev -> next = new_node;
     new_node->next = NULL;
     new_node->channels = NULL;
     return SUCCESS;
