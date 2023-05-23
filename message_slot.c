@@ -103,6 +103,10 @@ static ssize_t device_read( struct file* file,
   {
     return -EINVAL;
   }
+  if(buffer == NULL)
+  {
+    return -EINVAL;
+  }
   cnl = (channel*)p;
   if(cnl->message == NULL)
   {
