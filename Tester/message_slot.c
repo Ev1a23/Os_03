@@ -47,6 +47,7 @@ static int device_open( struct inode* inode,
   node* prev;
   int minor = iminor(inode);
   printk("In device open");
+  printk("minor is %d", minor);
   if(minor_lst == NULL)
   {
     printk("minor_lst is NULL");
@@ -101,19 +102,23 @@ static ssize_t device_read( struct file* file,
   printk("In device read");
   if(p == NULL)
   {
+    printk("p is NULL");
     return -EINVAL;
   }
   if(buffer == NULL)
   {
+    printk("Buffer is NULL");
     return -EINVAL;
   }
   cnl = (channel*)p;
   if(cnl->message == NULL)
   {
+    printk("cnl->message is NULL");
     return -EWOULDBLOCK;
   }
   if(length<cnl ->message_len)
   {
+    printk("length is smaller than message length");
     return -ENOSPC;
   }
   for(i = 0; i<BUF_LEN && i<length; i++)
@@ -121,6 +126,7 @@ static ssize_t device_read( struct file* file,
     res = put_user(((char*)cnl->message)[i], &buffer[i]);
     if(res < 0)
     {
+      printk("put_user failed");
       return i;
     }
   }
@@ -242,6 +248,7 @@ static long device_ioctl( struct   file* file,
       file -> private_data = (void*)cnl;
       return 1;
     }
+    printk("ioctl: cnl is not NULL, did not find channel, going next");
     cnl = cnl->next;
   }
   printk("ioctl: cnl is not NULL, did not find channel");
@@ -278,12 +285,14 @@ static int __init simple_init(void)
                        DEVICE_FILE_NAME, MAJOR_NUM );
     return rc;
   }
-  minor_lst = (node*)kmalloc(sizeof(node), GFP_KERNEL);
-  if(minor_lst == NULL)
-  {
-    return -ENOMEM;
-  }
-  printk("Simple init, minor_lst allocated");
+  // minor_lst = (node*)kmalloc(sizeof(node), GFP_KERNEL);
+  // minor_lst -> next = NULL;
+  // minor_lst -> channels = NULL;
+  // if(minor_lst == NULL)
+  // {
+  //   return -ENOMEM;
+  // }
+  // printk("Simple init, minor_lst allocated");
   return 0;
 }
 
