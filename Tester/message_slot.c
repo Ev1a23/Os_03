@@ -149,6 +149,8 @@ static ssize_t device_write( struct file*       file,
   ssize_t i;
   int res;
   printk("In device write");
+  printk("length is %ld", length);
+  printk("buffer is %s", buffer);
   if(length > BUF_LEN || length == 0)
   {
     printk("Invalid length");

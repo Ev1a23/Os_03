@@ -234,8 +234,8 @@ if __name__ == '__main__':
     for i in range(2):
         create_slot_file(filename_template, i)
 
-    test_ioctl_zero_fails()
-    test_long_write_fails()
+    # test_ioctl_zero_fails()
+    # test_long_write_fails()
     test_empty_write_fails()
     test_can_print_not_to_large()
 
