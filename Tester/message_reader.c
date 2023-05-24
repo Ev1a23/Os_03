@@ -1,64 +1,63 @@
-//
-// Created by sid on 07/12/2020.
-//
+#include <errno.h> 
+#include "message_slot.h"
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
-#include <limits.h>
-#include <fcntl.h>      /* open */
-#include <unistd.h>     /* exit */
-#include <sys/ioctl.h>  /* ioctl */
-#include "message_slot.h"
+#include <linux/fs.h>
 
-void clean(int fd) {
-    close(fd);
+void error(char *msg);
+
+int main (int argc, char** argv)
+{
+    if(argc !=3)
+    {
+        error(strerror(errno));
+    }
+    int fd = open(argv[1], O_RDONLY);
+    if(fd < 0)
+    {
+        error(strerror(errno));
+    }
+    long channel_id = strtoul(argv[2], NULL, 0);
+    if(ioctl(fd, MSG_SLOT_CHANNEL, channel_id) < 0)
+    {
+        error(strerror(errno));
+    }
+    char buffer[BUF_LEN];
+    if(buffer==NULL)
+    {
+        error(strerror(errno));
+    }
+    int read_bytes = read(fd, buffer, BUF_LEN);
+    if(read_bytes <0)
+    {
+        error(strerror(errno));
+    }
+    char msg[read_bytes];
+    for(int i = 0; i < read_bytes; ++i)
+    {
+        msg[i] = buffer[i];
+    }
+
+    if(close(fd)<0)
+    {
+        error(strerror(errno));
+    }
+
+    if(write(1, msg, read_bytes)<0)
+    {
+        error(strerror(errno));
+    }
+    
+    exit(0);
+
 }
 
-void exitAndClean(int fd) {
-    clean(fd);
-    exit(errno);
-}
-
-int main(int c, char **args) {
-    char *deviceFile, *msg;
-    long channelId;
-    int fd, retVal;
-
-    if (c != 3) {
-        printf("wrong amount of arguments given: %s", strerror(1));
-        exit(1);
-    }
-
-    deviceFile = args[1];
-    channelId = strtol(args[2], NULL, 10);
-    if (channelId == UINT_MAX && errno == ERANGE) {
-        perror("wrong channelId given: %s");
-        exit(1);
-    }
-
-    fd = open(deviceFile, O_RDWR);
-    if (fd < 0) {
-        perror("could not open file: %s");
-        exit(1);
-    }
-
-    if ((msg = calloc(BUF_LEN, sizeof(char))) == NULL) {
-        errno = -1;
-        exit(1);
-    }
-
-    if (ioctl(fd, MSG_SLOT_CHANNEL, (unsigned long) channelId) < 0) {
-        perror("ioctl failed");
-        exitAndClean(fd);
-    }
-    if ((retVal = read(fd, msg, BUF_LEN)) < 0) {
-        perror("read failed");
-        exitAndClean(fd);
-    }
-    clean(fd);
-    if ((write(STDOUT_FILENO, msg, retVal) != retVal)) {
-        perror("failed writing to STDOUT");
-    }
-    free(msg);
+void error(char *msg)
+{
+    fprintf(stderr, "%s", msg);
+    exit(1);
 }

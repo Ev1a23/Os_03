@@ -1,8 +1,3 @@
-//
-// Created by student on 04/12/2020.
-//
-
-#include "message_slot.h"
 // Declare what kind of code we want
 // from the header files. Defining __KERNEL__
 // and MODULE allows us to access kernel-level
@@ -12,291 +7,288 @@
 #undef MODULE
 #define MODULE
 
-
 #include <linux/kernel.h>   /* We're doing kernel work */
 #include <linux/module.h>   /* Specifically, a module */
 #include <linux/fs.h>       /* for register_chrdev */
-#include <linux/uaccess.h>  /* for get_user and put_user */
 #include <linux/string.h>   /* for memset. NOTE - not string.h!*/
-#include <linux/slab.h>
+#include <linux/slab.h>     /* for kmalloc */
+#include "message_slot.h"
 
 MODULE_LICENSE("GPL");
 
-#define SUCCESS 0
-#define MSG_MAX_LENGTH 128
-#define MAX_DEVICES ((1u<<8u)+1)
+// used to prevent concurent access into the same device
 
-typedef struct _ListNode {
-    int channelId;
-    char *msg;
-    int msgLength;
-    struct _ListNode *next;
-} ListNode;
 
-typedef struct _LinkedList {
-    ListNode *first;
-    int size;
-} LinkedList;
+//================== DEFINE CHANNEL LINKED LIST ===========================
 
-static LinkedList *devices[MAX_DEVICES] = {NULL};
+typedef struct channel
+{
+  int channel;
+  char* message;
+  struct channel* next;
+  size_t message_len;
+} channel;
+//================== DEFINE MINOR LINKED LIST ===========================
+typedef struct node
+{
+  int minor;
+  struct node* next;
+  channel* channels;
+} node;
 
-ListNode *findChannelId(LinkedList *lst, int channelId) {
-    ListNode *node = lst->first;
-    while (node != NULL) {
-        if (node->channelId == channelId) {
-            return node;
-        }
-        node = node->next;
-    }
-    return NULL;
-}
-
-void setMsg(ListNode *node, const char *msg, int msgLength) {
-    memcpy(node->msg, msg, msgLength);
-    node->msgLength = msgLength;
-}
-
-/**
- * Creates node. If it failed allocating memory for the message, it frees the node it created
- * REMARK: If this function return NULL, DO NOT ADD IT TO THE LINKED LIST
- */
-ListNode *createNode(int channelId) {
-    ListNode *node;
-    node = kmalloc(sizeof(ListNode), GFP_KERNEL);
-    if (node == NULL) return NULL;
-    node->msg = kmalloc(sizeof(char) * MSG_MAX_LENGTH, GFP_KERNEL);  // Allocate message memory
-    if (node->msg == NULL) {
-        kfree(node);
-        return NULL;
-    }
-    node->channelId = channelId;
-    node->next = NULL;
-    return node;
-}
-
-/**
- * Inserts msg into channelId
- * return NULL if there was a problem allocating memory, ListNode otherwise
- */
-ListNode *getOrCreateNode(LinkedList *lst, int channelId) {
-    ListNode *newNode, *prevNode, *node;
-    if (lst->size == 0) {
-        newNode = createNode(channelId);
-        if (newNode == NULL) return NULL;
-        lst->first = newNode;
-        lst->size++;
-        return newNode;
-    } else {
-        prevNode = NULL;
-        node = lst->first;
-        do {
-            if (channelId == node->channelId) {
-                return node;
-            } else if (channelId < node->channelId) {
-                newNode = createNode(channelId);
-                if (newNode == NULL) return NULL;
-                if (prevNode == NULL) {
-                    newNode->next = node;
-                    lst->first = newNode;
-                } else {
-                    newNode->next = node;
-                    prevNode->next = newNode;
-                }
-                lst->size++;
-                return newNode;
-            }
-            prevNode = node;
-            node = node->next;
-        } while (node != NULL);
-
-        newNode = createNode(channelId);
-        if (newNode == NULL) return NULL;
-        prevNode->next = newNode;
-        lst->size++;
-        return newNode;
-    }
-}
-
-void freeNode(ListNode *node) {
-    kfree(node->msg);
-    kfree(node);
-}
-
-void freeLst(LinkedList *lst) {
-    ListNode *prev, *cur;
-    if (lst->size!=0) {
-        prev = lst->first;
-        cur = prev->next;
-        while (cur != NULL) {
-            freeNode(prev);
-            prev = cur;
-            cur = cur->next;
-        }
-        freeNode(prev);
-    }
-    kfree(lst);
-}
-
+node* minor_lst;
 //================== DEVICE FUNCTIONS ===========================
-static int device_open(struct inode *inode,
-                       struct file *file) {
-    int minor;
-    printk("Invoking device_open(%p)\n", file);
-
-    minor = iminor(inode);
-    if (devices[minor + 1] == NULL) {
-        printk("adding minor %d to array\n", minor);
-        devices[minor + 1] = kmalloc(sizeof(LinkedList), GFP_KERNEL);
-        if (devices[minor + 1] == NULL) return -1;
-        devices[minor + 1]->size = 0;
+static int device_open( struct inode* inode,
+                        struct file*  file )
+{
+  node* head;
+  node* temp;
+  node* new_node;
+  node* prev;
+  int minor = iminor(inode);
+  printk("In device open");
+  if(minor_lst == NULL)
+  {
+    printk("minor_lst is NULL");
+    //need to build the LL
+    head = (node*)kmalloc(sizeof(node), GFP_KERNEL);
+    if(head == NULL)
+    {
+      return -ENOMSG;
     }
+    head->minor = minor;
+    head->next = NULL;
+    head->channels = NULL;
+    minor_lst = head;
     return SUCCESS;
+  }
+  else
+  {
+    printk("minor_lst is not NULL");
+    temp = minor_lst;
+    while(temp!= NULL)
+    {
+      if(temp->minor == minor)
+      {
+        printk("Device open, found minor");
+        return SUCCESS;
+      }
+      prev = temp;
+      temp = temp->next;
+    }
+    printk("Device open, did not find minor");
+    //need to add to LL
+    new_node = (node*)kmalloc(sizeof(node), GFP_KERNEL);
+    new_node->minor = minor;
+    prev -> next = new_node;
+    new_node->next = NULL;
+    new_node->channels = NULL;
+    return SUCCESS;
+  }
 }
-
 //---------------------------------------------------------------
 // a process which has already opened
 // the device file attempts to read from it
-static ssize_t device_read(struct file *file,
-                           char __user *buffer,
-                           size_t length,
-                           loff_t *offset) {
-    int status, minor;
-    unsigned long channelId;
-    LinkedList *lst;
-    ListNode *node;
-    char *tmpBuffer;
-    printk("Invoking device_read(%p,%ld)\n", file, length);
-    if (file->private_data == NULL) {
-        return -EINVAL;
-    }
-    channelId = (unsigned long) file->private_data;
-    minor = iminor(file->f_inode);
-    lst = devices[minor + 1];
-    if (devices[minor+1] == NULL) {  // Device didn't pass through open
-        return -EINVAL;
-    }
-    node = findChannelId(lst, channelId);
-    if (node != NULL) {
-        if (length < node->msgLength || buffer == NULL) {  // Ensure we have space to write to
-            return -ENOSPC;
-        }
-        if ((tmpBuffer = kmalloc(sizeof(char) * node->msgLength, GFP_KERNEL)) == NULL) {  // Init temp buffer to allow atomic transaction
-            return -ENOSPC;
-        }
-        memcpy(tmpBuffer, node->msg, node->msgLength); // Copy to temp buffer
-        if ((status = copy_to_user(buffer, tmpBuffer, node->msgLength))!=0) { // Write to user buffer
-            return -ENOSPC;
-        }
-        kfree(tmpBuffer);
-        return node->msgLength;
-    }
+static ssize_t device_read( struct file* file,
+                            char __user* buffer,
+                            size_t       length,
+                            loff_t*      offset )
+{
+  void *p = file -> private_data;
+  channel* cnl;
+  ssize_t i;
+  int res;
+  printk("In device read");
+  if(p == NULL)
+  {
+    return -EINVAL;
+  }
+  if(buffer == NULL)
+  {
+    return -EINVAL;
+  }
+  cnl = (channel*)p;
+  if(cnl->message == NULL)
+  {
     return -EWOULDBLOCK;
-}
-
-//----------------------------------------------------------------
-static long device_ioctl(struct file *file,
-                         unsigned int ioctl_command_id,
-                         unsigned long ioctl_param) {
-    // Switch according to the ioctl called
-    if (MSG_SLOT_CHANNEL == ioctl_command_id && ioctl_param != 0) {
-        file->private_data = (void *) ioctl_param;
-        // Get the parameter given to- ioctl by the process
-        printk("Invoking ioctl: setting channelId flag to %ld\n", ioctl_param);
-        return SUCCESS;
-    } else {
-        return -EINVAL;
+  }
+  if(length<cnl ->message_len)
+  {
+    return -ENOSPC;
+  }
+  for(i = 0; i<BUF_LEN && i<length; i++)
+  {
+    res = put_user(((char*)cnl->message)[i], &buffer[i]);
+    if(res < 0)
+    {
+      return i;
     }
+  }
+  printk("Read %ld bytes", i);
+  return i;
+
 }
 
 //---------------------------------------------------------------
 // a processs which has already opened
 // the device file attempts to write to it
-static ssize_t device_write(struct file *file,
-                            const char __user *buffer,
-                            size_t length,
-                            loff_t *offset) {
+static ssize_t device_write( struct file*       file,
+                             const char __user* buffer,
+                             size_t             length,
+                             loff_t*            offset)
+{
+  channel* cnl;
+  char* msg;
+  void *p;
+  ssize_t i;
+  int res;
+  printk("In device write");
+  if(length > BUF_LEN || length == 0)
+  {
+    printk("Invalid length");
+    return -EMSGSIZE;
+  }
+  if(buffer == NULL)
+  {
+    printk("Buffer is NULL");
+    return -EINVAL;
+  }
+  msg = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
+  if(msg == NULL)
+  {
+    return -ENOMEM;
+  }
+  p = file ->private_data;
+  if(p == NULL)
+  {
+    printk("p is NULL");
+    return -EINVAL;
+  }
+  cnl = (channel*)p;
+  if(cnl -> message == NULL)
+  {
+    cnl ->message = kmalloc(BUF_LEN, GFP_KERNEL);
+    if(cnl->message == NULL)
+    {
+      return -ENOMEM;
+    }
+  }
+  for(i = 0; i<length; i++)
+  {
+    res = get_user(msg[i], &buffer[i]);
+    if(res<0)
+    {
+      kfree(msg);
+      return i;
+    }
+  }
+  cnl->message_len = length;
+  cnl->message = msg;
+  return length;
+}
 
-    unsigned long channelId;
-    int status, minor;
-    char *tmpBuffer;
-    ListNode *node;
-    printk("Invoking device_write(%p,%ld)\n", file, length);
-    if (length > BUF_LEN || length <= 0) {  // Buffer has wrong size
-        return -EMSGSIZE;
+//----------------------------------------------------------------
+static long device_ioctl( struct   file* file,
+                          unsigned int   ioctl_command_id,
+                          unsigned long  ioctl_param )
+{
+  int minor;
+  node* temp;
+  channel* cnl;
+  printk("In device ioctl");
+  if(ioctl_command_id != MSG_SLOT_CHANNEL || ioctl_param == 0)
+  {
+    return -EINVAL;
+  }
+  minor = iminor(file->f_inode);
+  printk("minor is %d", minor);
+  temp = minor_lst;
+  while(temp!= NULL)
+  {
+    if(temp->minor == minor)
+      break;
+    temp = temp->next;
+  }
+  if(temp == NULL)
+  {
+    printk("temp is NULL");
+    return -EINVAL;
+  }
+  cnl = temp ->channels;
+  if(cnl == NULL)
+  {
+    cnl = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
+    if(cnl == NULL)
+    {
+      return -ENOMSG;
     }
-    if (file->private_data == NULL) {
-        return -EINVAL;
-    }
-    channelId = (unsigned long) file->private_data;
-    if (buffer == NULL) {
-        return -ENOSPC;
-    }
+    printk("cnl is NULL, creating new one");
+    cnl->channel = ioctl_param;
+    cnl->message = (void*)NULL;
+    cnl->message_len = 0;
+    cnl->next = NULL;
+    file -> private_data = (void*)cnl;
+    temp->channels = cnl;
+    return 1;
 
-    minor = iminor(file->f_inode);
-    if (devices[minor+1] == NULL) {  // Device didn't pass through open
-        return -EINVAL;
+  }
+  while(cnl != NULL)
+  {
+    if(cnl->channel == ioctl_param)
+    {
+      file -> private_data = (void*)cnl;
+      return 1;
     }
+    cnl = cnl->next;
+  }
+  return  -ENOMSG;
 
-    // Get or create relevant node to store data in
-    if ((node = getOrCreateNode(devices[minor + 1], channelId)) == NULL) {
-        return -ENOSPC;
-    }
-    node->msgLength = length;
-    if ((tmpBuffer = kmalloc(sizeof(char) * length, GFP_KERNEL)) == NULL) {
-        return -ENOSPC;
-    }
-    if ((status = copy_from_user(tmpBuffer, buffer, length))!=0) {
-        return -ENOSPC;
-    }
-    setMsg(node, tmpBuffer, length);
-    kfree(tmpBuffer);
-    return length;
 }
 
 //==================== DEVICE SETUP =============================
 
 // This structure will hold the functions to be called
 // when a process does something to the device we created
-struct file_operations Fops =
-        {
-                .owner      = THIS_MODULE, // Required for correct count of module usage. This prevents the module from being removed while used.
-                .read           = device_read,
-                .write          = device_write,
-                .open           = device_open,
-                .unlocked_ioctl          = device_ioctl,
-        };
+struct file_operations Fops = {
+  .owner	  = THIS_MODULE, 
+  .read           = device_read,
+  .write          = device_write,
+  .open           = device_open,
+  .unlocked_ioctl = device_ioctl,
+};
 
 //---------------------------------------------------------------
 // Initialize the module - Register the character device
-static int __init simple_init(void) {
-    // Register driver capabilities. Obtain major num
-    int success;
-    printk("registering with major %d and name %s\n", MAJOR_NUM, DEVICE_RANGE_NAME);
-    success = register_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME, &Fops);
-    if (success < 0) {
-        printk(KERN_ERR "%s registraion failed for  %d. received status %d\n",
-               DEVICE_RANGE_NAME, MAJOR_NUM, success);
-        return MAJOR_NUM;
-    }
-    printk("Registeration is successful. YAY");
-    return 0;
+static int __init simple_init(void)
+{
+  int rc = -1;
+  printk("msg: In simple init");
+
+  // Register driver capabilities. Obtain major num
+  rc = register_chrdev( MAJOR_NUM, DEVICE_RANGE_NAME, &Fops );
+
+  // Negative values signify an error
+  if( rc < 0 ) {
+    printk("tds");
+    printk("%s registraion failed for  %d\n",
+                       DEVICE_FILE_NAME, MAJOR_NUM );
+    return rc;
+  }
+  minor_lst = (node*)kmalloc(sizeof(node), GFP_KERNEL);
+  if(minor_lst == NULL)
+  {
+    return -ENOMEM;
+  }
+  printk("Simple init, minor_lst allocated");
+  return 0;
 }
 
 //---------------------------------------------------------------
-static void __exit simple_cleanup(void) {
-    // Unregister the device
-    // Should always succeed
-    LinkedList **tmp, **limit;
-    limit = devices + MAX_DEVICES;
-    printk("freeing memory\n");
-    for (tmp = devices + 1; tmp < limit; tmp++) {
-        if (*tmp != NULL) {
-            freeLst(*tmp);
-        }
-    }
-    printk("done freeing memory\n");
-    unregister_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME);
-    printk("successfully unregistered\n");
+static void __exit simple_cleanup(void)
+{
+  // Unregister the device
+  // Should always succeed
+  unregister_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME);
 }
 
 //---------------------------------------------------------------
