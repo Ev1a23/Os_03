@@ -32,7 +32,7 @@ int main (int argc, char** argv)
     {
         error(strerror(errno));
     }
-    if(write(fd, argv[3], len)<=0)
+    if(write(fd, argv[3], len)<0)
     {
         error(strerror(errno));
     }

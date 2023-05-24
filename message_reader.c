@@ -32,7 +32,7 @@ int main (int argc, char** argv)
         error(strerror(errno));
     }
     int read_bytes = read(fd, buffer, BUF_LEN);
-    if(read_bytes <=0)
+    if(read_bytes <0)
     {
         error(strerror(errno));
     }
