@@ -194,8 +194,11 @@ int main(int argc, char *argv[]) {
 	}
 
     write_read_before_ioctl(fd);
+    sleep(3);
 	error_buffer_size(fd);
+    sleep(3);
     read_no_message(fd);
+    sleep(3);
     write_read_null(fd);
 	close(fd);
 	return 0;

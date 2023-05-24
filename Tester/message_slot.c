@@ -201,6 +201,7 @@ static long device_ioctl( struct   file* file,
   int minor;
   node* temp;
   channel* cnl;
+  channel* prev;
   printk("In device ioctl");
   if(ioctl_command_id != MSG_SLOT_CHANNEL || ioctl_param == 0)
   {
@@ -249,10 +250,24 @@ static long device_ioctl( struct   file* file,
       return 1;
     }
     printk("ioctl: cnl is not NULL, did not find channel, going next");
+    prev = cnl;
     cnl = cnl->next;
   }
   printk("ioctl: cnl is not NULL, did not find channel");
-  return  -ENOMSG;
+  cnl = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
+  if(cnl == NULL)
+  {
+    printk("cnl is NULL, no memory");
+    return -ENOMSG;
+  }
+  printk("cnl is NULL, creating new one");
+  cnl->channel = ioctl_param;
+  cnl->message = (void*)NULL;
+  cnl->message_len = 0;
+  cnl->next = NULL;
+  file -> private_data = (void*)cnl;
+  prev->next = cnl;
+  return 1;
 
 }
 
