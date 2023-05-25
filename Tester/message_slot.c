@@ -285,11 +285,11 @@ static int __init simple_init(void)
 //---------------------------------------------------------------
 static void __exit simple_cleanup(void)
 {
-  node* prev;
+   node* prev;
   // Unregister the device
   // Should always succeed
   unregister_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME);
-  //now we need to free memory
+  now we need to free memory
   while(minor_lst != NULL)
   {
     channel* nxt = minor_lst->channels;
@@ -308,6 +308,7 @@ static void __exit simple_cleanup(void)
     minor_lst = minor_lst->next;
     kfree(prev);
   }
+  minor_lst = NULL;
 }
 
 //---------------------------------------------------------------
