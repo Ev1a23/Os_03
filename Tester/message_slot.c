@@ -46,11 +46,8 @@ static int device_open( struct inode* inode,
   node* new_node;
   node* prev;
   int minor = iminor(inode);
-  printk("In device open");
-  printk("minor is %d", minor);
   if(minor_lst == NULL)
   {
-    printk("minor_lst is NULL");
     //need to build the LL
     head = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     if(head == NULL)
@@ -65,19 +62,16 @@ static int device_open( struct inode* inode,
   }
   else
   {
-    printk("minor_lst is not NULL");
     temp = minor_lst;
     while(temp!= NULL)
     {
       if(temp->minor == minor)
       {
-        printk("Device open, found minor");
         return SUCCESS;
       }
       prev = temp;
       temp = temp->next;
     }
-    printk("Device open, did not find minor");
     //need to add to LL
     new_node = (node*)kmalloc(sizeof(node), GFP_KERNEL);
     new_node->minor = minor;
@@ -99,38 +93,47 @@ static ssize_t device_read( struct file* file,
   channel* cnl;
   ssize_t i;
   int res;
-  printk("In device read");
+  char* tmp;
   if(p == NULL)
   {
-    printk("p is NULL");
-    return -EINVAL;
-  }
-  if(buffer == NULL)
-  {
-    printk("Buffer is NULL");
     return -EINVAL;
   }
   cnl = (channel*)p;
   if(cnl->message == NULL)
   {
-    printk("cnl->message is NULL");
     return -EWOULDBLOCK;
   }
   if(length<cnl ->message_len)
   {
-    printk("length is smaller than message length");
     return -ENOSPC;
   }
+  if(buffer == NULL)
+  {
+    return -EINVAL;
+  }
+  tmp =kmalloc(BUF_LEN*sizeof(char),GFP_KERNEL);
+  if(tmp == NULL)
+  {
+    return -ENOMSG;
+  }
+  for(i = 0; i<BUF_LEN&& i<cnl->message_len; i++)
+  {
+    res = get_user(tmp[i], &buffer[i]);
+    if(res < 0)
+    {
+      kfree(tmp);
+      return -EINVAL;
+    }
+  }
+  kfree(tmp);
   for(i = 0; i<BUF_LEN && i<cnl->message_len; i++)
   {
     res = put_user(((char*)cnl->message)[i], &buffer[i]);
     if(res < 0)
     {
-      printk("put_user failed");
-      return i;
+      return -EINVAL;
     }
   }
-  printk("Read %ld bytes", i);
   return i;
 
 }
@@ -148,29 +151,23 @@ static ssize_t device_write( struct file*       file,
   void *p;
   ssize_t i;
   int res;
-  printk("In device write");
-  printk("length is %ld", length);
-  printk("buffer is %s", buffer);
+  p = file ->private_data;
+  if(p == NULL)
+  {
+    return -EINVAL;
+  }
   if(length > BUF_LEN || length == 0)
   {
-    printk("Invalid length");
     return -EMSGSIZE;
   }
   if(buffer == NULL)
   {
-    printk("Buffer is NULL");
     return -EINVAL;
   }
   msg = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
   if(msg == NULL)
   {
     return -ENOMEM;
-  }
-  p = file ->private_data;
-  if(p == NULL)
-  {
-    printk("p is NULL");
-    return -EINVAL;
   }
   cnl = (channel*)p;
   for(i = 0; i<length; i++)
@@ -197,14 +194,11 @@ static long device_ioctl( struct   file* file,
   node* temp;
   channel* cnl;
   channel* prev;
-  printk("In device ioctl");
   if(ioctl_command_id != MSG_SLOT_CHANNEL || ioctl_param == 0)
   {
-    printk("Invalid ioctl_command_id or ioctl_param");
     return -EINVAL;
   }
   minor = iminor(file->f_inode);
-  printk("minor is %d", minor);
   temp = minor_lst;
   while(temp!= NULL)
   {
@@ -214,7 +208,6 @@ static long device_ioctl( struct   file* file,
   }
   if(temp == NULL)
   {
-    printk("temp is NULL");
     return -EINVAL;
   }
   cnl = temp ->channels;
@@ -223,10 +216,8 @@ static long device_ioctl( struct   file* file,
     cnl = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
     if(cnl == NULL)
     {
-      printk("cnl is NULL, no memory");
       return -ENOMSG;
     }
-    printk("cnl is NULL, creating new one");
     cnl->channel = ioctl_param;
     cnl->message = (void*)NULL;
     cnl->message_len = 0;
@@ -237,25 +228,19 @@ static long device_ioctl( struct   file* file,
   }
   while(cnl != NULL)
   {
-    printk("ioctl: cnl is not NULL");
     if(cnl->channel == ioctl_param)
     {
-      printk("ioctl: cnl is not NULL, found channel");
       file -> private_data = (void*)cnl;
       return 1;
     }
-    printk("ioctl: cnl is not NULL, did not find channel, going next");
     prev = cnl;
     cnl = cnl->next;
   }
-  printk("ioctl: cnl is not NULL, did not find channel");
   cnl = (channel*)kmalloc(sizeof(channel), GFP_KERNEL);
   if(cnl == NULL)
   {
-    printk("cnl is NULL, no memory");
     return -ENOMSG;
   }
-  printk("cnl is NULL, creating new one");
   cnl->channel = ioctl_param;
   cnl->message = (void*)NULL;
   cnl->message_len = 0;
@@ -290,19 +275,10 @@ static int __init simple_init(void)
 
   // Negative values signify an error
   if( rc < 0 ) {
-    printk("tds");
     printk("%s registraion failed for  %d\n",
                        DEVICE_FILE_NAME, MAJOR_NUM );
     return rc;
   }
-  // minor_lst = (node*)kmalloc(sizeof(node), GFP_KERNEL);
-  // minor_lst -> next = NULL;
-  // minor_lst -> channels = NULL;
-  // if(minor_lst == NULL)
-  // {
-  //   return -ENOMEM;
-  // }
-  // printk("Simple init, minor_lst allocated");
   return 0;
 }
 
