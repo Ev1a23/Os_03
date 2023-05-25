@@ -173,14 +173,6 @@ static ssize_t device_write( struct file*       file,
     return -EINVAL;
   }
   cnl = (channel*)p;
-  if(cnl -> message == NULL)
-  {
-    cnl ->message = kmalloc(BUF_LEN, GFP_KERNEL);
-    if(cnl->message == NULL)
-    {
-      return -ENOMEM;
-    }
-  }
   for(i = 0; i<length; i++)
   {
     res = get_user(msg[i], &buffer[i]);
