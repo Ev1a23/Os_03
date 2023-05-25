@@ -182,6 +182,7 @@ static ssize_t device_write( struct file*       file,
       return i;
     }
   }
+  kfree(cnl->message);
   cnl->message_len = length;
   cnl->message = msg;
   return length;
