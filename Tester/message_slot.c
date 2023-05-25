@@ -285,9 +285,29 @@ static int __init simple_init(void)
 //---------------------------------------------------------------
 static void __exit simple_cleanup(void)
 {
+  node* prev;
   // Unregister the device
   // Should always succeed
   unregister_chrdev(MAJOR_NUM, DEVICE_RANGE_NAME);
+  //now we need to free memory
+  while(minor_lst != NULL)
+  {
+    channel* nxt = minor_lst->channels;
+    channel* tmp;
+    while(nxt!=NULL)
+    {
+      if(nxt -> message != NULL)
+      {
+        kfree(nxt->message);
+      }
+      tmp = nxt;
+      nxt = nxt->next;
+      kfree(tmp);
+    }
+    prev = minor_lst;
+    minor_lst = minor_lst->next;
+    kfree(prev);
+  }
 }
 
 //---------------------------------------------------------------
