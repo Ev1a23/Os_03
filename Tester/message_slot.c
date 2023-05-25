@@ -121,7 +121,7 @@ static ssize_t device_read( struct file* file,
     printk("length is smaller than message length");
     return -ENOSPC;
   }
-  for(i = 0; i<BUF_LEN && i<length; i++)
+  for(i = 0; i<BUF_LEN && i<cnl->message_len; i++)
   {
     res = put_user(((char*)cnl->message)[i], &buffer[i]);
     if(res < 0)
