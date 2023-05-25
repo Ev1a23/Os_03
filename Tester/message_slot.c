@@ -161,7 +161,7 @@ static ssize_t device_write( struct file*       file,
     printk("Buffer is NULL");
     return -EINVAL;
   }
-  msg = (char*)kmalloc(sizeof(char)*length, GFP_KERNEL);
+  msg = (char*)kmalloc(sizeof(char)*BUF_LEN, GFP_KERNEL);
   if(msg == NULL)
   {
     return -ENOMEM;
